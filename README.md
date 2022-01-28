@@ -1,0 +1,2 @@
+# Buscaminas
+Simple mineswipeer game
