@@ -2,25 +2,121 @@ package minesweeper
 
 import kotlin.random.Random
 
-class Game (val rows: Int = 9,
-            val columns: Int = 9,
-            val mines: Int)
+class Field (val rows: Int = 9,
+             val columns: Int = 9,
+             val mines: Int)
 
 const val minesSymbol = "X"
 const val safeCellsSymbol = "."
+const val markedCellsSymbol = "*"
+
+enum class PlayerMoves{
+    MARKED_CELL,
+    MARKED_CELL_WITH_NUMBER,
+    MARKED_CELL_WITH_MINE,
+    UNMARKED_NORMAL_CELL,
+    UNMARKED_MINE_CELL
+}
 fun main() {
-    val gameSettings = Game(mines = setNumberOfMines())
+    val gameSettings = Field(mines = setNumberOfMines())
     val board = builtGameBoard(gameSettings = gameSettings)
-    printGameBoard(gameBoard = board)
+    playGame(gameBoard = board, gameSettings = gameSettings)
 }
 
-fun printGameBoard(gameBoard: MutableList<MutableList<String>>) {
-    for (rows in gameBoard) {
-        println(rows.joinToString(""))
+fun playGame(gameBoard: MutableList<MutableList<String>>, gameSettings: Field) {
+    val minesLocation = getMinesLocations(gameBoard = gameBoard)
+    var score = 0
+    var otherCells = 0
+    var printBoard = true
+    do {
+        var keepPlaying = true
+        if (printBoard) printGameBoard(gameBoard = gameBoard)
+        printBoard = true
+        val userCoordinates = askUserPlay()
+        val moveResult = checkUserPlay(
+            gameBoard = gameBoard,
+            userCoordinates = userCoordinates,
+            minesLocation = minesLocation
+        )
+        when(moveResult) {
+            PlayerMoves.MARKED_CELL -> otherCells++ // If marked a safe cell
+            PlayerMoves.MARKED_CELL_WITH_NUMBER -> {
+                println("There is a number here!")
+                printBoard = false
+            }
+            PlayerMoves.MARKED_CELL_WITH_MINE -> score++ // If marked a mine
+            PlayerMoves.UNMARKED_NORMAL_CELL -> otherCells-- // If unmarked a safe cell
+            PlayerMoves.UNMARKED_MINE_CELL -> score-- // If unmarked a correct mine
+        }
+        if (score == gameSettings.mines && otherCells == 0) keepPlaying = false
+    } while (keepPlaying)
+
+    printGameBoard(gameBoard = gameBoard)
+    println("Congratulations! You found all the mines!")
+}
+
+fun checkUserPlay(gameBoard: MutableList<MutableList<String>>, userCoordinates: List<Int>, minesLocation: MutableList<String>): PlayerMoves {
+    // easier way to understand the coordinates
+    val x = userCoordinates[0]
+    val y = userCoordinates[1]
+    return when {
+        gameBoard[x][y] == safeCellsSymbol -> { // if the cell is not a number or mine just chance the symbol
+            gameBoard[x][y] = markedCellsSymbol
+            PlayerMoves.MARKED_CELL
+        }
+        // if the chosen cell has a number
+        gameBoard[x][y].first().isDigit() -> return PlayerMoves.MARKED_CELL_WITH_NUMBER
+        // In case that the chosen cell has mine
+        gameBoard[x][y] ==  minesSymbol -> {
+            gameBoard[x][y] = markedCellsSymbol
+            PlayerMoves.MARKED_CELL_WITH_MINE
+        }
+        // In case that the chosen cell is already marked then it will be unmarked
+        gameBoard[x][y] == markedCellsSymbol -> {
+            if (minesLocation.contains("$x $y")) {
+                gameBoard[x][y] = minesSymbol
+                PlayerMoves.UNMARKED_MINE_CELL
+            } else {
+                gameBoard[x][y] = safeCellsSymbol
+                PlayerMoves.UNMARKED_NORMAL_CELL
+            }
+        }
+        else -> PlayerMoves.MARKED_CELL
     }
 }
 
-fun builtGameBoard(gameSettings: Game): MutableList<MutableList<String>> {
+fun askUserPlay(): List<Int> {
+    print("Set/delete mine marks (x and y coordinates): ")
+    val aux = readLine()!!.split(" ").map { it.toInt() - 1 } // Minus 1 to change them to array indexes
+    return listOf(aux[1], aux[0]) // Change the position of the indexes to match with array format
+}
+
+fun getMinesLocations(gameBoard: MutableList<MutableList<String>>): MutableList<String> {
+    val locations = mutableListOf<String>()
+    for (i in 0 until gameBoard.size) {
+        for (j in 0 until gameBoard.size) {
+            if (gameBoard[i][j] == minesSymbol) locations.add("$i $j")
+        }
+    }
+    return locations
+}
+
+fun printGameBoard(gameBoard: MutableList<MutableList<String>>) {
+    println(" |123456789|")
+    println("-|---------|")
+    var c = 1
+    for (rows in gameBoard) {
+        print("$c|")
+        for (column in rows) {
+            if (column == minesSymbol) print(safeCellsSymbol) else print(column)
+        }
+        print("|\n")
+        c++
+    }
+    println("-|---------|")
+}
+
+fun builtGameBoard(gameSettings: Field): MutableList<MutableList<String>> {
     // Create games board full of safe cells symbol "."
     val board = MutableList(gameSettings.rows) {
         MutableList(gameSettings.columns) { safeCellsSymbol }
